@@ -31,6 +31,28 @@ rule faidx:
         samtools faidx {input}
         """
 
+rule fastp:
+    input:
+        r1 = config["reads_dir"] + "/{sample}_R1.fastq.gz",
+        r2 = config["reads_dir"] + "/{sample}_R2.fastq.gz"
+    output:
+        r1 = config["output_trim"] + "/{sample}_R1.trimmed.fastq.gz",
+        r2 = config["output_trim"] + "/{sample}_R2.trimmed.fastq.gz",
+        json = config["output_trim"] + "/{sample}.fastp.json",
+        html = config["output_trim"] + "/{sample}.fastp.html"
+    threads: 4
+    resources:
+        mem_mb = 4000,
+        runtime = 30
+    log:
+        "logs/fastp/{sample}.log"
+    shell:
+        """
+        module load fastp
+        fastp -i {input.r1} -I {input.r2} -o {output.r1} -O {output.r2} \
+            -w {threads} -j {output.json} -h {output.html} 2> {log}
+        """
+
 rule bwa_map:
     input:
         r1 = config["output_trim"] + "/{sample}_R1.trimmed.fastq.gz",
