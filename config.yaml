@@ -1,0 +1,24 @@
+# Configuration for snakemake_call.smk
+#
+# Paths are kept identical to the params in nextflow_call.nf so that the two
+# implementations read the same inputs and can be compared output-for-output.
+# All paths are relative to the directory Snakemake is launched from.
+
+# Reference genome (FASTA). bwa-mem2 index files and the .fai are written
+# alongside this file by the bwa_index and faidx rules.
+genome: test_genome/b73_chr1_150000001-151000000.fasta
+
+# Directory of raw paired-end reads, named {sample}_R1.fastq.gz / {sample}_R2.fastq.gz.
+# Sample names are discovered from this directory via glob_wildcards.
+reads_dir: 01_data
+
+# Trimmed reads, named {sample}_R1.trimmed.fastq.gz / {sample}_R2.trimmed.fastq.gz.
+# NOTE: no rule in snakemake_call.smk produces these yet — the trimming step
+# (fastp, as in the Nextflow version) still needs to be added.
+output_trim: 03_trimmed
+
+# Coordinate-sorted BAMs plus their .bai indexes.
+output_aligned: 08_aligned
+
+# Per-sample VCFs from bcftools call.
+output_variants: 09_variants
