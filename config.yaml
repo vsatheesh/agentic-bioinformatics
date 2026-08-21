@@ -12,9 +12,9 @@ genome: test_genome/b73_chr1_150000001-151000000.fasta
 # Sample names are discovered from this directory via glob_wildcards.
 reads_dir: 01_data
 
-# Trimmed reads, named {sample}_R1.trimmed.fastq.gz / {sample}_R2.trimmed.fastq.gz.
-# NOTE: no rule in snakemake_call.smk produces these yet — the trimming step
-# (fastp, as in the Nextflow version) still needs to be added.
+# Trimmed reads from the fastp rule, named
+# {sample}_R1.trimmed.fastq.gz / {sample}_R2.trimmed.fastq.gz.
+# The per-sample fastp .json and .html reports are written here too.
 output_trim: 03_trimmed
 
 # Coordinate-sorted BAMs plus their .bai indexes.
