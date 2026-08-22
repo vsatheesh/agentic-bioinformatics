@@ -5,6 +5,11 @@ configfile: "config.yaml"
 GENOME = config["genome"]
 SAMPLES, = glob_wildcards(config["reads_dir"] + "/{sample}_R1.fastq.gz")
 
+if not SAMPLES:
+    raise WorkflowError(
+        "No reads matching {sample}_R1.fastq.gz found in " + config["reads_dir"]
+    )
+
 rule all:
     input:
         expand(config["output_variants"] + "/{sample}.vcf", sample=SAMPLES)
@@ -71,7 +76,10 @@ rule bwa_map:
         """
         module load bwa_mem2
         module load samtools
-        bwa-mem2 mem -t {threads} {input.genome} {input.r1} {input.r2} 2> {log} | samtools sort -@ {threads} -o {output}
+        bwa-mem2 mem -t {threads} -K 100000000 \
+            -R '@RG\\tID:{wildcards.sample}\\tSM:{wildcards.sample}\\tPL:ILLUMINA' \
+            {input.genome} {input.r1} {input.r2} 2> {log} \
+            | samtools sort -@ {threads} -o {output}
         """
 
 rule bam_index:
