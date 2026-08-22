@@ -21,12 +21,12 @@ include { BcftoolsCall }     from './modules/bcftools_call.nf'
 // The reference is prepared once (bwa-mem2 index + samtools faidx) and reused by every sample.
 workflow {
     // --- Reference channels (prepared once, reused by all samples) ---
-    genome_ch = Channel.fromPath(params.genome)
+    genome_ch = Channel.fromPath(params.genome, checkIfExists: true)
     index_ch  = BwaMem2Index(genome_ch)      // tuple(genome, index_files)
     faidx_ch  = SamtoolsFaidx(genome_ch)     // tuple(genome, genome.fai)
 
     // --- Per-sample: trim ---
-    read_pairs_ch = Channel.fromFilePairs(params.reads, flat: true)
+    read_pairs_ch = Channel.fromFilePairs(params.reads, flat: true, checkIfExists: true)
     trimmed_ch    = Fastp(read_pairs_ch)     // tuple(sample_id, R1.trimmed, R2.trimmed)
 
     // --- Align (mem | sort) -> sorted BAM ---
