@@ -1,114 +1,128 @@
 # Plan
 
-The idea behind this repo is to watch how AI coding agents handle real
-bioinformatics work. To do that we need something to check their answers
-against. That's what the two pipelines are for: the same variant calling job
-written twice, once in Snakemake and once in Nextflow. If both give the same
-answer on the same data, we can trust that answer, and we can score whatever
-an agent produces against it.
+We want to see how AI coding agents handle real bioinformatics work. To grade
+them we need a right answer to grade against. That's what the two pipelines
+are for: the same variant calling job written twice, once in Snakemake and
+once in Nextflow. If both give the same answer on the same data, we trust that
+answer, and we score the agents against it.
 
-The work below is in the order it has to happen. The first three parts are
-just getting the pipelines into shape. The study itself comes last.
+Steps are in the order they have to happen. The study itself comes last.
 
 ## Where things stand
 
-Both pipelines now do the same five steps: trim the reads, index the genome,
-align and sort, index the BAM, call variants. The step names differ (rules in
-Snakemake, processes in Nextflow) but they line up one to one.
+- Both pipelines do the same five steps: trim the reads, index the genome,
+  align and sort, index the BAM, call variants.
+- The names differ (rules in Snakemake, processes in Nextflow) but they match
+  up one to one.
+- Neither pipeline has been run yet. Everything below is untested.
 
-Neither pipeline has actually been run yet. Everything below is untested.
+## Step 1: get one run to finish
 
-## First: get one run to finish
+- Commit the six Nextflow module files. They're referenced but missing, so
+  nothing runs without them.
+- Copy the two flags we added to the Snakemake aligner in `fe067ff` and
+  `e2656c7` into the Nextflow aligner module:
+  - `-K 100000000`, so the alignment doesn't change when the thread count
+    changes.
+  - the `@RG` line, so the sample name ends up in the output instead of the
+    file path.
+  - If only one side has these, the two pipelines will disagree and it won't
+    be either pipeline's fault.
+- Commit test data: the 1 Mb piece of B73 chr1 the config already points at,
+  plus a couple of small read pairs. Small enough for git, big enough to give
+  real variants.
+- Add a `nextflow.config`: where to run, and cores and memory per step.
+- Add a `.gitignore` so work folders and outputs don't get committed.
 
-Five things are in the way, roughly in the order you'll hit them.
+Done when both pipelines run start to finish and give one VCF per sample.
 
-The Nextflow side pulls in six module files that aren't in the repo: fastp,
-the two indexing steps, the aligner, the BAM indexer, and the caller. Nothing
-runs until those are committed.
+## Step 2: decide what "same answer" means
 
-Once they're there, the aligner module needs the same two flags we added to
-the Snakemake version in `fe067ff` and `e2656c7`: `-K 100000000`, which stops
-the alignment from changing when the thread count changes, and the `@RG` line,
-which puts the sample name in the output instead of the file path. If only one
-side has these, the two pipelines will disagree and it won't be either
-pipeline's fault.
-
-We also need test data committed — the 1 Mb chunk of B73 chr1 the config
-already points at, plus a couple of small read pairs. Small enough to keep in
-git, big enough to actually produce variants.
-
-Then a `nextflow.config` (which machine to run on, how many cores and how much
-memory each step gets), and a `.gitignore` so the work directories and outputs
-don't get committed by accident.
-
-Done when both pipelines run start to finish and produce a VCF per sample.
-
-## Second: decide what "same answer" means
-
-This is the part that does the real work, and it's easy to skip past.
-
-Two VCFs from the same reads will never be byte-identical. Headers differ,
-the tool records its own command line, records at the same position can come
-out in a different order. None of that matters. What matters is whether the
-two pipelines found the same variants in the same places.
-
-So we need a small script that tidies both files up the same way and then
-compares just the variant lists. Run it on the output from the previous step
-and keep fixing things until it comes back clean. If something still differs,
-one of the two pipelines is wrong, and we need to know that before going any
-further. This is the step that lets the README say "cross-validated" and mean
-it.
-
-Whatever both pipelines agree on becomes the reference. That's what agent runs
-get scored against later.
+- Two VCFs from the same reads are never identical byte for byte. Headers
+  differ, the tool writes its own command line into the file, and records at
+  the same position can come out in a different order.
+- None of that matters. What matters is whether both found the same variants
+  in the same places.
+- Write a small script that cleans up both files the same way and compares
+  just the variant lists.
+- Run it and keep fixing until it comes back clean. Anything left over means
+  one of the pipelines is wrong, and we need to know that now.
+- Save what both pipelines agree on. That's the reference the agents get
+  scored against.
+- Save the intermediate BAMs too. When an agent's output is wrong, these show
+  which step it went wrong at.
 
 Done when the script passes and the reference files are saved.
 
-## Third: pin the versions
+## Step 3: pin everything down
 
-Right now both pipelines just say `module load bwa_mem2` and so on, with no
-version. That means they pick up whatever the cluster happens to have that
-day, and that changes over time. For a study meant to be repeatable, that's a
-problem. A run six months from now wouldn't be comparable to one today.
+- Both pipelines say `module load bwa_mem2` and so on with no version, so they
+  pick up whatever the cluster has that day. Name the versions, or move to
+  conda or containers. Containers are the better bet if anyone off this
+  cluster will ever repeat this.
+- Pin the agents the same way. Model versions change under the same name, so
+  write down the exact version and the date for every run.
+- Have each run record what it used: tool versions, model version, git commit,
+  and the command.
+- Re-run the Step 2 comparison afterwards to check that pinning didn't change
+  anything.
 
-Either name the versions explicitly, or switch to conda environments or
-containers. Containers are the better bet if anyone outside this cluster is
-ever going to reproduce this.
+## Step 4: build the tasks
 
-While we're at it, each run should write down what it used: tool versions, the
-git commit, the command. Then re-run the comparison from the previous step to
-make sure pinning didn't quietly change anything.
+This is the part of the study we're actually changing between runs, and none
+of it exists yet.
 
-## Fourth: the actual study
+- Write a set of faults to seed, each saved as a patch with its correct fix
+  written down. Rough ideas:
+  - a wrong path in the config
+  - a rule whose output name doesn't match what the next rule expects
+  - a missing genome index
+  - R1 and R2 swapped
+  - a memory limit too low to finish
+- Add a few tasks that aren't bug fixes: run the pipeline as given, add a new
+  step, rewrite a step from one language in the other.
+- Keep the answers out of reach. Right now the commit message on `e2656c7`
+  explains the thread-count problem, and this file spells it out again. An
+  agent that reads the git log or opens this file has been handed the answer.
+  - Give each run a clean copy with history that doesn't discuss the bug.
+  - Keep the reference VCFs out of the agent's working folder.
+- Decide when a run is over: the agent says it's done, or a turn limit, or a
+  time limit. If runs end whenever, the timing numbers mean nothing.
 
-Only worth starting once the three parts above hold, since everything here is
-measured against the reference files.
+## Step 5: run the study
 
-We need to settle on the tasks. Some rough ideas, easiest first: just run the
-pipeline; find and fix a config we've broken on purpose; add a new step; take
-a step from one pipeline and rewrite it in the other language.
+- One folder per run holding the prompt, the whole conversation, whatever the
+  agent changed, and the output files. Runs stay out of each other's way and
+  out of the reference copy.
+- Pick a control to compare against: a person doing the same tasks under the
+  same limit, or an agent that can edit but not run anything. Without one we
+  can describe what agents did but can't say whether it was any good.
+- Measure:
+  - did it produce anything at all
+  - do the variants match the reference
+  - tokens and cost (a better measure of effort than wall clock, which on the
+    cluster is mostly queue time)
+  - how many rounds of back and forth
+  - did it edit files it shouldn't have touched
+  - did it quietly weaken the pipeline to make the errors go away
+- Agree on how the diffs get read, and by whom. A short list of failure types
+  helps: hardcoded a path, deleted the failing step, weakened a filter, fixed
+  the symptom not the cause, gave up. If two people score, check they agree.
+- Agents don't give the same answer twice, so one run per task tells us
+  nothing. Pick the number of repeats up front.
+- Keep a second dataset the tasks were never tuned on, to tell a real fix from
+  one that only works on the sample it was built against.
+- Write down what we expect to happen and how we'll analyse it before
+  collecting anything, then leave it alone.
 
-We need somewhere to put the results — one folder per run holding the prompt,
-the whole conversation, whatever the agent changed, and the output files. Runs
-have to stay out of each other's way, and out of the reference copy.
+## Still to decide
 
-We need to agree on what we're measuring. Did it produce anything? Do the
-variants match the reference? How long did it take, and how many rounds of
-back and forth? Did it wander off and edit files it shouldn't have touched?
-And the one really worth watching for: did it quietly weaken the pipeline to
-make the errors go away.
-
-Agents don't give the same answer twice, so one run per task tells us nothing.
-Pick a number of repeats up front.
-
-## Things we still need to decide
-
-- How close do the two pipelines have to be? Same list of variants, or do the
-  quality and depth numbers have to match too? Strict matching might not be
-  achievable if the two callers are set up even slightly differently.
-- Which agents are we testing, and how do we drive them?
+- How close do the pipelines have to be? Same list of variants, or do the
+  quality and depth numbers have to match too? Strict matching may not be
+  possible if the two callers differ even slightly in their defaults.
+- Which agents, and how do we drive them?
 - How many repeats per task?
-- Do agents get to see both pipelines, or only one? Showing both gives away
-  the answer for the rewrite task.
-- Can the genome slice be shared publicly, or does the test data need to be
-  downloaded by a script instead of committed?
+- Do agents see both pipelines or only one? Showing both gives away the answer
+  for the rewrite task.
+- Can the genome piece be shared publicly, or does the test data need a
+  download script instead?
