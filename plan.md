@@ -14,6 +14,10 @@ Steps are in the order they have to happen. The study itself comes last.
   align and sort, index the BAM, call variants.
 - The names differ (rules in Snakemake, processes in Nextflow) but they match
   up one to one.
+- That's the shape matching, not the behaviour. What each step actually does
+  comes down to the flags it runs with, and on the Nextflow side those sit in
+  the module files that aren't committed yet. So we can't say yet that the two
+  really do the same thing.
 - Neither pipeline has been run yet. Everything below is untested.
 
 ## Step 1: get one run to finish
@@ -28,10 +32,20 @@ Steps are in the order they have to happen. The study itself comes last.
     file path.
   - If only one side has these, the two pipelines will disagree and it won't
     be either pipeline's fault.
+- Match the rest of the settings the same way once the modules are visible:
+  - fastp: the Snakemake rule runs on defaults, so whatever quality and length
+    settings the Nextflow module uses need copying over, or both sides need
+    setting on purpose.
+  - bcftools mpileup: called with no options on the Snakemake side, so its
+    default depth cap and annotations have to match too.
 - Commit test data: the 1 Mb piece of B73 chr1 the config already points at,
   plus a couple of small read pairs. Small enough for git, big enough to give
   real variants.
-- Add a `nextflow.config`: where to run, and cores and memory per step.
+- Add a `nextflow.config`: where to run, and cores and memory per step. Use
+  the same core counts as the Snakemake rules. Snakemake asks for 4 threads,
+  so Nextflow should ask for 4, not just some number. `samtools sort -@` can
+  reorder records sitting at the same position, and fastp's `-w` changes its
+  output, so these have to line up.
 - Add a `.gitignore` so work folders and outputs don't get committed.
 
 Done when both pipelines run start to finish and give one VCF per sample.
@@ -43,14 +57,22 @@ Done when both pipelines run start to finish and give one VCF per sample.
   the same position can come out in a different order.
 - None of that matters. What matters is whether both found the same variants
   in the same places.
+- Before comparing the two against each other, check each one against itself:
+  run it twice on the same input and compare. If a pipeline can't reproduce
+  its own output, comparing it to the other one tells us nothing.
 - Write a small script that cleans up both files the same way and compares
   just the variant lists.
 - Run it and keep fixing until it comes back clean. Anything left over means
   one of the pipelines is wrong, and we need to know that now.
 - Save what both pipelines agree on. That's the reference the agents get
   scored against.
-- Save the intermediate BAMs too. When an agent's output is wrong, these show
-  which step it went wrong at.
+- Compare at every step, not just the final VCF. Checksum the trimmed reads,
+  the sorted BAMs and the calls separately. Comparing only the end tells us
+  that they differ; comparing each step tells us where, which is the
+  difference between a quick fix and a day of guessing.
+- Do this on at least two samples. One sample can agree by luck.
+- Keep the intermediate BAMs. When an agent's output is wrong later, these
+  show which step it went wrong at.
 
 Done when the script passes and the reference files are saved.
 
