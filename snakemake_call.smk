@@ -12,7 +12,7 @@ if not SAMPLES:
 
 rule all:
     input:
-        expand(config["output_variants"] + "/{sample}.vcf", sample=SAMPLES)
+        expand(config["output_variants"] + "/{sample}.vcf.gz", sample=SAMPLES)
 
 rule bwa_index:
     input:
@@ -100,11 +100,14 @@ rule call:
         genome = GENOME,
         fai = GENOME + ".fai"
     output:
-        config["output_variants"] + "/{sample}.vcf"
+        vcf = config["output_variants"] + "/{sample}.vcf.gz",
+        csi = config["output_variants"] + "/{sample}.vcf.gz.csi"
     log:
         "logs/call/{sample}.log"
     shell:
         """
         module load bcftools
-        bcftools mpileup -f {input.genome} {input.bam} 2> {log} | bcftools call -mv -Ov -o {output}
+        bcftools mpileup -f {input.genome} -d 1000 -a AD,DP {input.bam} 2> {log} \
+            | bcftools call -mv -Oz -o {output.vcf} 2>> {log}
+        bcftools index {output.vcf} 2>> {log}
         """
