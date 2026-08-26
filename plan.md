@@ -113,6 +113,8 @@ of it exists yet.
 
 ## Step 5: run the study
 
+Written up in more detail in `plan_agent_runs.md`.
+
 - One folder per run holding the prompt, the whole conversation, whatever the
   agent changed, and the output files. Runs stay out of each other's way and
   out of the reference copy.
