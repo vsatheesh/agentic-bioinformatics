@@ -22,25 +22,25 @@ include { BcftoolsCall }     from './modules/bcftools_call.nf'
 workflow {
     // --- Reference channels (prepared once, reused by all samples) ---
     genome_ch = Channel.fromPath(params.genome, checkIfExists: true)
-    index_ch  = BwaMem2Index(genome_ch)      // tuple(genome, index_files)
-    faidx_ch  = SamtoolsFaidx(genome_ch)     // tuple(genome, genome.fai)
+    index_ch  = BwaMem2Index(genome_ch).index    // tuple(genome, index_files)
+    faidx_ch  = SamtoolsFaidx(genome_ch).faidx   // tuple(genome, genome.fai)
 
     // --- Per-sample: trim ---
     read_pairs_ch = Channel.fromFilePairs(params.reads, flat: true, checkIfExists: true)
-    trimmed_ch    = Fastp(read_pairs_ch)     // tuple(sample_id, R1.trimmed, R2.trimmed)
+    trimmed_ch    = Fastp(read_pairs_ch).reads   // tuple(sample_id, R1.trimmed, R2.trimmed)
 
     // --- Align (mem | sort) -> sorted BAM ---
     // combine attaches the single reference-index tuple to every sample tuple:
     //   (sample_id, R1, R2) + (genome, index_files) -> (sample_id, R1, R2, genome, index_files)
     align_input_ch = trimmed_ch.combine(index_ch.first())
-    sorted_bam_ch  = BwaMem2AlignSort(align_input_ch)   // tuple(sample_id, sorted.bam)
+    sorted_bam_ch  = BwaMem2AlignSort(align_input_ch).bam   // tuple(sample_id, sorted.bam)
 
     // --- Index the sorted BAM ---
-    indexed_bam_ch = SamtoolsIndex(sorted_bam_ch)       // tuple(sample_id, bam, bai)
+    indexed_bam_ch = SamtoolsIndex(sorted_bam_ch).indexed   // tuple(sample_id, bam, bai)
 
     // --- Call variants ---
     // attach the reference + .fai to every indexed-BAM tuple:
     //   (sample_id, bam, bai) + (genome, fai) -> (sample_id, bam, bai, genome, fai)
     call_input_ch = indexed_bam_ch.combine(faidx_ch.first())
-    BcftoolsCall(call_input_ch)              // tuple(sample_id, sample_id.vcf)
+    BcftoolsCall(call_input_ch).vcf          // tuple(sample_id, vcf, csi)
 }
