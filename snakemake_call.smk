@@ -1,4 +1,10 @@
 # Script 14: Variant calling (through the VCF)
+#
+# Tools come from the pinned env in envs/bioinfo.yaml. Activate it first, then:
+#   mamba activate agentic-bioinfo
+#   snakemake -s snakemake_call.smk -j4
+# On ISU HPC, `module load` the cluster tools instead (see DESIGN.md step 3).
+# scripts/run_pipeline.sh does this for you and sends output to its own folder.
 
 configfile: "config.yaml"
 
@@ -21,7 +27,6 @@ rule bwa_index:
         multiext(GENOME, ".0123", ".amb", ".ann", ".bwt.2bit.64", ".pac")
     shell:
         """
-        module load bwa_mem2
         bwa-mem2 index {input}
         """
 
@@ -32,7 +37,6 @@ rule faidx:
         GENOME + ".fai"
     shell:
         """
-        module load samtools
         samtools faidx {input}
         """
 
@@ -53,7 +57,6 @@ rule fastp:
         "logs/fastp/{sample}.log"
     shell:
         """
-        module load fastp
         fastp -i {input.r1} -I {input.r2} -o {output.r1} -O {output.r2} \
             -w {threads} -j {output.json} -h {output.html} 2> {log}
         """
@@ -74,8 +77,6 @@ rule bwa_map:
         "logs/bwa_map/{sample}.log"
     shell:
         """
-        module load bwa_mem2
-        module load samtools
         bwa-mem2 mem -t {threads} -K 100000000 \
             -R '@RG\\tID:{wildcards.sample}\\tSM:{wildcards.sample}\\tPL:ILLUMINA' \
             {input.genome} {input.r1} {input.r2} 2> {log} \
@@ -89,7 +90,6 @@ rule bam_index:
         config["output_aligned"] + "/{sample}.sorted.bam.bai"
     shell:
         """
-        module load samtools
         samtools index {input}
         """
 
@@ -106,7 +106,6 @@ rule call:
         "logs/call/{sample}.log"
     shell:
         """
-        module load bcftools
         bcftools mpileup -f {input.genome} -d 1000 -a AD,DP {input.bam} 2> {log} \
             | bcftools call -mv -Oz -o {output.vcf} 2>> {log}
         bcftools index {output.vcf} 2>> {log}
